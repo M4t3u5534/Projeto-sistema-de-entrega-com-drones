@@ -1,50 +1,49 @@
 /*
-Implementação dos dados da solicitação de entrega. Cliente passa dados e seleciona produto, 
-passando direta ou indiretamente:
--> Drone e seus dados utilizado na entrega do pedido
--> Cliente e seus dados que fez o pedido
+Implementação da classe entrega. Cliente passa seu id e seleciona id do
+produto que deseja comprar.
+-> Chaves estrangeiras (ids Produto e Cliente)
+-> dados do drone
 -> Peso do pacote (o peso foi definido a partir da quantidade de itens indo de 0-3 que o cliente selecionou)
- */
+-> Status da entrega (pendente ou finalizada)
+*/
 
 import java.time.LocalDateTime; // salvar dada e horario do pedido
 
 public class Entrega {
-    // Contém dados chaves estrangeiras
     private int id;
-    private Cliente cliente;
+    // id - chaves estrangeiras
+    private int idProduto;
+    private int idCliente;
     private Drone drone;
-    private double pesoPacote;
-    private String enderecoDestino;
-    private String statusEntrega; // "PENDENTE", "FINALIZADA"
-    private LocalDateTime dataHora;
+    private int peso;
+    private String status;
+    private LocalDateTime dataCompra;
 
     // Construtor
-    public Entrega(Cliente cliente, double pesoPacote, String enderecoDestino) {
-        this.cliente = cliente;
-        this.pesoPacote = pesoPacote;
-        this.enderecoDestino = enderecoDestino;
-        this.statusEntrega = "PENDENTE";
-        this.dataHora = LocalDateTime.now();
+    public Entrega(int idProduto, int idCliente, Drone drone, int peso) {
+        this.idProduto = idProduto;
+        this.idCliente = idCliente;
+        this.drone = drone;
+        this.peso = peso;
+        this.status = "Pendente";
+        this.dataCompra = LocalDateTime.now();
     }
-
     // Getters e Setters
     public int getId() { return id; }
 
     public void setId(int id) { this.id = id; }
-
-    public Cliente getCliente() { return cliente; }
-
+    
+    public int getIdProduto() { return idProduto; }
+    
+    public int getIdCliente() { return idCliente; }
+    
     public Drone getDrone() { return drone; }
-
-    public void setDrone(Drone drone) { this.drone = drone; }
-
-    public double getPesoPacote() { return pesoPacote; }
-
-    public String getEnderecoDestino() { return enderecoDestino; }
-
-    public String getStatusEntrega() { return statusEntrega; }
-
-    public void setStatusEntrega(String statusEntrega) { this.statusEntrega = statusEntrega; }
-
-    public LocalDateTime getDataHora() { return dataHora; }
+    
+    public int getPeso() { return peso; }
+    
+    public String getStatus() { return status; }
+    
+    public void setStatus(String status) { this.status = status; }
+    
+    public LocalDateTime getDataCompra() { return dataCompra; }
 }
