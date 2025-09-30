@@ -1,59 +1,103 @@
 /*
 DroneDAO.java é uma classe auxiliar que faz a comunicação necessária com o banco
-de dados. Ela foi utilizada para fazer as insersões (inserirDrone), listagem dos drones
-(listarDrones)
-Nesse caso, os drones vão ser cadastrados automaticamente na main (caso não estiverem cadastrados).
-Foi definido um limite de 5 drones. O status do drone fica 'PENDENTE' até o quinto drone receber um pedido,
-então os drone são 'enviados' e seu status atualiza para 'FINALIZADO'.
+de dados. Ela foi utilizada para fazer as insersões, listagem dos drones e atualização
+de dados de status no bd.
 
 Fontes:
 https://medium.com/@felipe.damasceno.b/padr%C3%B5es-de-projeto-e-o-data-access-object-dao-7d7e4818866c
  */
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class DroneDAO {
-    private Connection conexao;
 
-    // construtor que recebe a conexão comum com as outras DAOs
-    public DroneDAO(Connection conexao) {
-        this.conexao = conexao;
-    }
+    public void cadastrarDrone(Drone drone) {
+        String sql = "INSERT INTO Drone (id, statusBateria, capacidade, disponivel) VALUES (?, ?, ?, ?)";
 
-    // faz o cadastro do drone no banco de dados
-    public void inserirDrone(Drone drone) {
-        // comunicação em linguagem sql a partir dos dados do Drone cadastrado
-        String sql = "INSERT INTO Drone (status_bateria, capacidade_carga, disponivel) VALUES (?, ?, ?)";
-        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
-            stmt.setInt(1, drone.getStatusBateria());
-            stmt.setDouble(2, drone.getCapacidadeCarga());
-            stmt.setBoolean(3, drone.isDisponivel());
+        try (Connection conn = BancoDeDados.conectar();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, drone.getId());
+            stmt.setInt(2, drone.getStatusBateria());
+            stmt.setInt(3, drone.getCapacidade());
+            stmt.setBoolean(4, drone.isDisponivel());
             stmt.executeUpdate();
-            System.out.println("Drone cadastrado");
+
         } catch (SQLException e) {
             System.out.println("Erro ao cadastrar drone: " + e.getMessage());
         }
     }
 
-    // retorna lista completa dos drones
-    public List<Drone> listarDrones() {
-        List<Drone> drones = new ArrayList<>();
-        String sql = "SELECT * FROM Drone";
-        try (Statement stmt = conexao.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {// retorna um ResultSet com todas as linhas do banco
-            while (rs.next()) {
-                Drone d = new Drone(
-                        rs.getInt("status_bateria"),
-                        rs.getDouble("capacidade_carga"),
-                        rs.getBoolean("disponivel")
-                );
-                d.setId(rs.getInt("id_drone"));
-                drones.add(d);
+    public Drone buscarDroneDisponivel(int pesoNecessario) {
+        String sql = "SELECT * FROM Drone WHERE disponivel = true AND capacidade >= ? ORDER BY capacidade ASC LIMIT 1";
+        try (Connection conn = BancoDeDados.conectar();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, pesoNecessario);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return new Drone(rs.getInt("id"),
+                                 rs.getInt("statusBateria"),
+                                 rs.getInt("capacidade"),
+                                 rs.getBoolean("disponivel"));
             }
+
+        } catch (SQLException e) {
+            System.out.println("Erro ao buscar drone disponível: " + e.getMessage());
+        }
+        return null;
+    }
+
+    public List<Drone> listarDrones() {
+        List<Drone> lista = new ArrayList<>();
+        String sql = "SELECT * FROM Drone";
+        try (Connection conn = BancoDeDados.conectar();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                Drone d = new Drone(rs.getInt("id"),
+                                    rs.getInt("statusBateria"),
+                                    rs.getInt("capacidade"),
+                                    rs.getBoolean("disponivel"));
+                lista.add(d);
+            }
+
         } catch (SQLException e) {
             System.out.println("Erro ao listar drones: " + e.getMessage());
         }
-        return drones;
+        return lista;
     }
+
+    public void atualizarDisponibilidade(int idDrone, boolean disponivel) {
+        String sql = "UPDATE Drone SET disponivel = ? WHERE id = ?";
+        try (Connection conn = BancoDeDados.conectar();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setBoolean(1, disponivel);
+            stmt.setInt(2, idDrone);
+            stmt.executeUpdate();
+
+        } catch (SQLException e) {
+            System.out.println("Erro ao atualizar disponibilidade do drone: " + e.getMessage());
+        }
+    }
+    public void atualizarDrone(Drone drone) {
+        String sql = "UPDATE Drone SET statusBateria = ?, disponivel = ? WHERE id = ?";
+        try (Connection conn = BancoDeDados.conectar();
+            PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, drone.getStatusBateria());
+            stmt.setBoolean(2, drone.isDisponivel());
+            stmt.setInt(3, drone.getId());
+            stmt.executeUpdate();
+
+        } catch (SQLException e) {
+            System.out.println("Erro ao atualizar drone: " + e.getMessage());
+        }
+    }
+
+
 }
