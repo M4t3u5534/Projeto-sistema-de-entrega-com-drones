@@ -1,219 +1,288 @@
 /*
-Para o código da Main, foi feito o uso de Inteligencia Artificial Generativa (chatGPT) para auxiliar na
-criação de uma interface interativa que simula a aba de cadastro e compra de produtos. Comando básicos
-foram feitos pelo integrante Pedro Henrique Carvalho Pereira através de exemplos práticos disponíveis
-nos sites anexados abaixo. 
-A inteligencia artificial foi apenas utilizada no tratamento de erros, ajuda na criação dos botões
-interativos, plotagem da tabela na interface e correção no trecho da seleção da quantidade de itens.
-
+Main.java é um código que vai juntar todas funcionalidades em um menu
+interativo através do terminal. Essa classe vai fazer a coleta dos inputs
+do usuário e contém varios metodos que fazem a aquisição e uso das DAOs
+implementadas durante o código.
 
 Fontes:
-https://www.devmedia.com.br/introducao-a-interface-gui-no-java/25646
-https://docs.oracle.com/javase/8/docs/api/javax/swing/JOptionPane.html (usado para a seleção da qunt de itens do produto)
-https://www.alura.com.br/artigos/como-criar-interface-grafica-swing-java
+https://www.devmedia.com.br/como-funciona-a-classe-scanner-do-java/28448 
+https://www.dio.me/articles/como-usar-switch-case-no-java (usavamos em c e em python)
  */
 
-import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
-import java.awt.*;
-import java.awt.event.*;
-import java.sql.Connection;
 import java.util.List;
+import java.util.Scanner;
 
-public class Main extends JFrame {
+public class Main {
+    // scanner para todos inputs (evita abrir e fechar multiplos scanners - boa prática)
+    private static final Scanner sc = new Scanner(System.in);
 
-    private Connection conexao;
-    private ClienteDAO clienteDAO;
-    private DroneDAO droneDAO;
-    private EntregaDAO entregaDAO;
-
-    private JTextField tfNome, tfEmail, tfEndereco, tfTelefone;
-    private JButton btnProduto1, btnProduto2, btnProduto3;
-    private DefaultTableModel tableModel;
-    private JTable tabelaPedidos;
-
-    private int contadorPedidosPendentes = 0;
-
-    public Main() {
-        // criar conexão com o banco de dados e inicialização da conexão das classes auxiliares de manipulação do banco
-        conexao = BancoDeDados.conectar();
-        clienteDAO = new ClienteDAO(conexao);
-        droneDAO = new DroneDAO(conexao);
-        entregaDAO = new EntregaDAO(conexao);
-
-
-
-        // método interno que inicializa 5 drones fixos, porém pode ser alterado como quiser
-        inicializarDrones();
-
-        // configuração da janela (tamanho, título da GUI e etc)
-        setTitle("Sistema de Pedidos com Drones");
-
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(800, 500);
-        setResizable(false);
-        setLocationRelativeTo(null);
-
-        // --- Painel principal com BoxLayout ---
-        JPanel mainPanel = new JPanel();
-        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-
-        // --- Painel de cliente ---
-        JPanel painelCliente = new JPanel(new GridLayout(4, 2, 5, 5));
-        painelCliente.setBorder(BorderFactory.createTitledBorder("Dados do Cliente"));
-
-        tfNome = new JTextField(10);
-        tfEmail = new JTextField(10);
-        tfEndereco = new JTextField(10);
-        tfTelefone = new JTextField(10);
-
-        painelCliente.add(new JLabel("Nome:"));
-        painelCliente.add(tfNome);
-        painelCliente.add(new JLabel("Email:"));
-        painelCliente.add(tfEmail);
-        painelCliente.add(new JLabel("Endereço:"));
-        painelCliente.add(tfEndereco);
-        painelCliente.add(new JLabel("Telefone:"));
-        painelCliente.add(tfTelefone);
-
-        mainPanel.add(painelCliente);
-
-        // --- Painel de produtos ---
-        JPanel painelProdutos = new JPanel(new FlowLayout());
-        painelProdutos.setBorder(BorderFactory.createTitledBorder("Escolha um Produto"));
-
-        btnProduto1 = new JButton("Produto 1");
-        btnProduto2 = new JButton("Produto 2");
-        btnProduto3 = new JButton("Produto 3");
-
-        painelProdutos.add(btnProduto1);
-        painelProdutos.add(btnProduto2);
-        painelProdutos.add(btnProduto3);
-
-        mainPanel.add(painelProdutos);
-
-        // --- Tabela de pedidos ---
-        tableModel = new DefaultTableModel(new String[]{"Cliente", "Email", "Pedido", "Status"}, 0);
-        tabelaPedidos = new JTable(tableModel);
-        tabelaPedidos.setFillsViewportHeight(true);
-
-        JScrollPane scrollPane = new JScrollPane(tabelaPedidos);
-        scrollPane.setPreferredSize(new Dimension(780, 200));
-        mainPanel.add(scrollPane);
-
-        add(mainPanel);
-
-        // --- Ações dos produtos ---
-        ActionListener pedidoListener = e -> registrarPedido(((JButton) e.getSource()).getText());
-        btnProduto1.addActionListener(pedidoListener);
-        btnProduto2.addActionListener(pedidoListener);
-        btnProduto3.addActionListener(pedidoListener);
-
-        atualizarTabela();
-
-        setVisible(true);
-    }
-
-    /* metodo que inicializa os drones. A DAO e a estrutura criada são reaproveitaveis 
-    para quantos drones forem necessários
-    
-     */
-    private void inicializarDrones() {
-        List<Drone> dronesExistentes = droneDAO.listarDrones();
-        if (dronesExistentes.size() >= 5) return;
-
-        for (int i = dronesExistentes.size(); i < 5; i++) {
-            Drone d = new Drone(100, 5.0, true);
-            droneDAO.inserirDrone(d);
-        }
-    }
-
-    /* registro dos pedidos com tratamento de erros para endereço inválido ou campos não preenchidos na GUI */
-    private void registrarPedido(String produto) {
-        // validação dos campos
-        if (tfNome.getText().isEmpty() || tfEmail.getText().isEmpty() || tfEndereco.getText().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Preencha Nome, Email e Endereço.");
-            return;
-        }
-
-        // validação de formato de endereço (TO DO: fazer com CEP para ser mais real)
-        String endereco = tfEndereco.getText().trim();
-        if (!endereco.matches("Rua\\s+.+\\s+\\d+")) {
-            JOptionPane.showMessageDialog(this, "Formato inválido, use: Rua XXXXX NUMERO");
-            return;
-        }
-
-        try {
-            // cadastra cliente ou usa cliente já cadastrado
-            String email = tfEmail.getText();
-            Cliente cliente = clienteDAO.listarClientes().stream()
-                    .filter(c -> c.getEmail().equalsIgnoreCase(email))
-                    .findFirst()
-                    .orElseGet(() -> {
-                        Cliente c = new Cliente(tfNome.getText(), tfEmail.getText(), endereco, tfTelefone.getText());
-                        clienteDAO.inserirCliente(c);
-                        List<Cliente> updated = clienteDAO.listarClientes();
-                        return updated.get(updated.size() - 1);
-                    });
-
-            // --- Escolher quantidade de itens (1 a 3) ---
-            int quantidadeItens = 1; // padrão
-            String[] opcoes = {"1", "2", "3"};
-            String q = (String) JOptionPane.showInputDialog(this, 
-                "Escolha a quantidade de itens (1 a 3):", 
-                "Quantidade de Itens", 
-                JOptionPane.QUESTION_MESSAGE, 
-                null, opcoes, opcoes[0]);
-            if (q == null) return; // cancelou
-            quantidadeItens = Integer.parseInt(q);
-
-            // cada item pesa 1, limite do drone é 3 itens e cada drone é destinado a uma entrega
-            double pesoPacote = quantidadeItens * 1.0;
-
-            // cria a entrega para o pedido
-            Entrega entrega = new Entrega(cliente, pesoPacote, "Pedido: " + produto + " (" + quantidadeItens + " itens)");
-            entregaDAO.registrarEntrega(entrega);
-
-            contadorPedidosPendentes++;
-
-            // atualizar tabela na interface
-            atualizarTabela();
-
-            // ao chegar no quinto pedido, finaliza todas pendentes
-            // lógica pensada para 5 drones deve ser alterada a medida que aumentam os drone
-            if (contadorPedidosPendentes >= 5) {
-                entregaDAO.finalizarEntregasPendentes();
-                contadorPedidosPendentes = 0;
-                atualizarTabela();
-            }
-
-            JOptionPane.showMessageDialog(this, "Pedido enviado para entrega");
-
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-    }
-
-    // atualiza a tabela na interface, usa o metodo criado da DAO da entrega (junta dados do cliente, drone e status da entrega)
-    private void atualizarTabela() {
-        try {
-            tableModel.setRowCount(0);
-            List<Entrega> entregas = entregaDAO.listarEntregesComClienteEDrone(); // método que retorna lista completa
-            for (Entrega e : entregas) {
-                tableModel.addRow(new Object[]{
-                        e.getCliente().getNome(),
-                        e.getCliente().getEmail(),
-                        e.getEnderecoDestino(),
-                        e.getStatusEntrega()
-                });
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-    }
+    private static final ClienteDAO clienteDAO = new ClienteDAO();
+    private static final DroneDAO droneDAO = new DroneDAO();
+    private static final ProdutoDAO produtoDAO = new ProdutoDAO();
+    private static final EntregaDAO entregaDAO = new EntregaDAO();
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new Main());
+        /* Sistema de interação via terminal. Commit anterior usava GUI, mas foi necessário 'downgrade' para 
+         * implementar recursos mais genéricos e que englobam melhor o projeto
+         */
+        while (true) {
+            System.out.println("\n--- Sistema de Entregas com Drones ---");
+            System.out.println("1. Cadastro de Cliente");
+            System.out.println("2. Cadastro de Drone (admin)");
+            System.out.println("3. Cadastro de Produto (admin)");
+            System.out.println("4. Realizar Compra");
+            System.out.println("5. Listar Entregas (admin)");
+            System.out.println("6. Finalizar Entrega (admin)");
+            System.out.println("7. Recarregar Drones (admin)");
+            System.out.println("0. Sair");
+            System.out.print("Escolha uma opção: ");
+
+            String opcao = sc.nextLine();
+
+            switch (opcao) {
+                case "1" -> cadastrarCliente();
+                case "2" -> { if (validarSenhaAdmin()) cadastrarDrone(); }
+                case "3" -> { if (validarSenhaAdmin()) cadastrarProduto(); }
+                case "4" -> realizarCompra();
+                case "5" -> { if (validarSenhaAdmin()) listarEntregas(); }
+                case "6" -> { if (validarSenhaAdmin()) finalizarEntrega(); }
+                case "7" -> { if (validarSenhaAdmin()) recarregarDrones(); }
+                case "0" -> { System.out.println("Encerrando sistema."); return; }
+                default -> System.out.println("Opção invalida.");
+            }
+        }
+    }
+
+    // CADASTRO CLIENTE 
+    private static void cadastrarCliente() {
+        try {
+            System.out.print("Nome: ");
+            String nome = sc.nextLine().trim();
+
+            System.out.print("CEP (12345-678 ou 12345678): ");
+            String cep = sc.nextLine().trim();
+
+            System.out.print("Email (opcional): ");
+            String email = sc.nextLine().trim();
+
+            System.out.print("Telefone (opcional, apenas números): ");
+            String telefone = sc.nextLine().trim();
+
+            Cliente cliente = new Cliente(nome, cep, email.isEmpty() ? null : email,
+                    telefone.isEmpty() ? null : telefone);
+
+            clienteDAO.cadastrarCliente(cliente);
+            System.out.println("Cliente cadastrado. Seu ID é: " + cliente.getId());
+        // tratamento de erro para qualquer dado errado, não insere e mostra erro apenas após o útlimo dado cadastrado
+        } catch (IllegalArgumentException e) {
+            System.out.println("Erro no cadastro: " + e.getMessage());
+        }
+    }
+
+    // CADASTRO DRONE
+    private static void cadastrarDrone() {
+        try {
+            System.out.print("ID do Drone (somente números): ");
+            int id = Integer.parseInt(sc.nextLine().trim());
+
+            System.out.print("Status da bateria (0-100): ");
+            int bateria = Integer.parseInt(sc.nextLine().trim());
+
+            System.out.print("Capacidade máxima (peso): ");
+            int capacidade = Integer.parseInt(sc.nextLine().trim());
+
+            System.out.print("Disponível? (true/false): ");
+            boolean disponivel = Boolean.parseBoolean(sc.nextLine().trim());
+
+            Drone drone = new Drone(id, bateria, capacidade, disponivel);
+            droneDAO.cadastrarDrone(drone);
+            System.out.println("Drone cadastrado");
+        // tratamento de erro para qualquer dado errado, não insere e mostra erro apenas após o útlimo dado cadastrado
+        } catch (NumberFormatException e) {
+            System.out.println("Erro: digite apenas numeros onde necessário.");
+        } catch (IllegalArgumentException e) {
+            System.out.println("Erro: " + e.getMessage());
+        }
+    }
+
+    // CADASTRO PRODUTO
+    private static void cadastrarProduto() {
+        try {
+            System.out.print("ID do Produto: ");
+            int id = Integer.parseInt(sc.nextLine().trim());
+
+            System.out.print("Nome do Produto: ");
+            String nome = sc.nextLine().trim();
+
+            System.out.print("Peso do Produto: ");
+            int peso = Integer.parseInt(sc.nextLine().trim());
+
+            System.out.print("Preço do Produto: ");
+            double preco = Double.parseDouble(sc.nextLine().trim());
+
+            Produto produto = new Produto(id, nome, peso, preco);
+            produtoDAO.cadastrarProduto(produto);
+            System.out.println("Produto cadastrado");
+
+        } catch (NumberFormatException e) {
+            System.out.println("Erro: digite valores numéricos válidos.");
+        }
+    }
+
+
+    // REALIZAR COMPRA
+    private static void realizarCompra() {
+        try {
+            System.out.print("Digite seu ID de cliente: ");
+            String idStr = sc.nextLine().trim();
+            if (!idStr.matches("\\d+")) {
+                System.out.println("ID invalido, use apenas números.");
+                return;
+            }
+            int idCliente = Integer.parseInt(idStr);
+            Cliente cliente = clienteDAO.buscarClientePorId(idCliente);
+            if (cliente == null) {
+                System.out.println("Nenhum cliente encontrado para esse ID.");
+                return;
+            }
+
+            List<Produto> produtos = produtoDAO.listarProdutos();
+            if (produtos.isEmpty()) {
+                System.out.println("Nenhum produto cadastrado");
+                return;
+            }
+
+            System.out.println("Produtos disponíveis:");
+            for (Produto p : produtos) {
+                System.out.println(p.getId() + " - " + p.getNome() + " | Peso: " + p.getPeso() + " | Preço: " + p.getPreco());
+            }
+
+            System.out.print("Digite o ID do produto que deseja comprar: ");
+            String idProdStr = sc.nextLine().trim();
+            if (!idProdStr.matches("\\d+")) {
+                System.out.println("ID de produto inválido.");
+                return;
+            }
+            int idProduto = Integer.parseInt(idProdStr);
+
+            Produto produto = produtoDAO.buscarProdutoPorId(idProduto);
+            if (produto == null) {
+                System.out.println("Produto não encontrado.");
+                return;
+            }
+
+            Drone droneDisponivel = droneDAO.buscarDroneDisponivel(produto.getPeso());
+            if (droneDisponivel == null) {
+                System.out.println("Não há drones disponíveis para a entrega deste produto.");
+                return;
+            }
+
+
+
+            Entrega entrega = new Entrega(idProduto, idCliente, droneDisponivel, produto.getPeso());
+            entregaDAO.cadastrarEntrega(entrega);
+            System.out.println("Compra feita, entrega cadastrada com ID: " + entrega.getId());
+
+        } catch (NumberFormatException e) {
+            System.out.println("Erro de entrada numérica: " + e.getMessage());
+        }
+    }
+
+    
+    // LISTAR ENTREGAS (tabela)
+    private static void listarEntregas() {
+        List<Entrega> entregas = entregaDAO.listarEntregas();
+        // Se entregas estiver fazio, sinaliza
+        if (entregas.isEmpty()) {
+            System.out.println("Nenhuma entrega cadastrada");
+            return;
+        }
+        // TOD0: metodo criado na main. Pode ser função em EntregaDAO
+        System.out.printf("%-5s %-10s %-10s %-5s %-10s %-12s %-20s\n", // formatações pro cabeçalho
+                "ID", "Produto", "Cliente", "Peso", "DroneID", "Status", "Data Compra");
+        for (Entrega e : entregas) {
+            System.out.printf("%-5d %-10d %-10d %-5d %-10d %-12s %-20s\n", // formatação pros dados
+                    e.getId(), e.getIdProduto(), e.getIdCliente(), e.getPeso(),
+                    e.getDrone().getId(), e.getStatus(), e.getDataCompra());
+        }
+    }
+
+    // FINALIZAR ENTREGA
+    private static void finalizarEntrega() {
+        try {
+            List<Entrega> pendentes = entregaDAO.listarEntregasPendentes();
+            if (pendentes.isEmpty()) {
+                System.out.println("Não existem entregas pendentes");
+                return;
+            }
+
+            System.out.println("Entregas pendentes:");
+            for (Entrega e : pendentes) {
+                System.out.printf("%d - Produto %d, Cliente %d, Peso %d, Drone %d\n",
+                        e.getId(), e.getIdProduto(), e.getIdCliente(), e.getPeso(), e.getDrone().getId());
+            }
+
+            System.out.print("Digite o ID da entrega que deseja finalizar: ");
+            int idEntrega = Integer.parseInt(sc.nextLine().trim());
+            Entrega entrega = entregaDAO.buscarEntregaPorId(idEntrega);
+
+            if (entrega == null || !entrega.getStatus().equals("Pendente")) {
+                System.out.println("Entrega inválida.");
+                return;
+            }
+
+            Drone drone = entrega.getDrone();
+            int novaBateria = drone.getStatusBateria() - (int) (drone.getStatusBateria() * 0.2); // 20% de bateria
+            drone.setStatusBateria(novaBateria);
+            drone.setDisponivel(novaBateria >= 50);
+
+            entrega.setStatus("Finalizado");
+            entregaDAO.atualizarEntrega(entrega);
+            droneDAO.atualizarDrone(drone);
+
+            System.out.println("Entrega finlaizada e drone liberado");
+
+        } catch (NumberFormatException e) {
+            System.out.println("ID invalido");
+        }
+    }
+
+    // RECARREGAR DRONES
+    private static void recarregarDrones() {
+        List<Drone> drones = droneDAO.listarDrones();
+        for (Drone d : drones) {
+            if (d.getStatusBateria() < 50) {
+                d.setStatusBateria(100);
+                d.setDisponivel(true);
+                droneDAO.atualizarDrone(d);
+            }
+        }
+        System.out.println("Todos os drones com bateria abaixo de 50% foram recarregados para 100%.");
+    }
+
+    // VALIDAÇÃO DE SENHA ADMIN
+    private static boolean validarSenhaAdmin() {
+        System.out.print("Digite a senha de administrador: ");
+        String senha = sc.nextLine().trim(); 
+        try {
+            java.util.Properties prop = new java.util.Properties(); // cria properties para acessar o dado sensível (senha)
+            java.io.FileInputStream input = new java.io.FileInputStream("config.properties");
+            prop.load(input);
+            input.close();
+            String senhaAdmin = prop.getProperty("DB_PASS"); // armazena a variavel sensível
+
+            // compara
+            if (!senha.equals(senhaAdmin)) {
+                System.out.println("Senha incorreta!");
+                return false;
+            }
+        // tratamento de erro caso dê algo de errado na leitura do config.properties
+        } catch (Exception e) {
+            System.out.println("Erro ao ler senha do arquivo: " + e.getMessage());
+            return false;
+        }
+        return true;
+
+
     }
 }
