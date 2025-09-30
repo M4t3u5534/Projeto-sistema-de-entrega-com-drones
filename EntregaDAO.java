@@ -1,117 +1,161 @@
 /*
 EntregaDAO.java é uma classe auxiliar que faz a comunicação necessária com o banco
-de dados. Ela foi utilizada para fazer as insersões (registrarEntrega), atualização 
-de status das esntregas (finalizarEntregasPendentes), listagem das entregas com
-os dados dos clientes e drone associado ao pedido (listarEntregesComClienteEDrone) 
+de dados. Ela foi utilizada para fazer cadastrar entregas, atualização 
+de status das esntregas, listagem das entregas comos dados dos clientes 
+e drone associado ao pedido, busca por id (função auxiliar), mostrar pendentes 
 
 Fontes:
 https://medium.com/@felipe.damasceno.b/padr%C3%B5es-de-projeto-e-o-data-access-object-dao-7d7e4818866c
  */
 import java.sql.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 public class EntregaDAO {
-    private Connection conexao;
 
-    public EntregaDAO(Connection conexao) {
-        this.conexao = conexao;
-    }
+    // cadastrar entrega já existente
+    public void cadastrarEntrega(Entrega entrega) {
+        
+        String sql = "INSERT INTO Entrega (idProduto, idCliente, idDrone, peso, status, dataCompra) VALUES (?, ?, ?, ?, ?, ?)";
+        
+        try (Connection conn = BancoDeDados.conectar();
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-    // Registrar entrega com atribuição automática de drone
-    public void registrarEntrega(Entrega entrega) throws SQLException {
-        // busca drone disponível
-        String sqlDrone = "SELECT * FROM Drone WHERE disponivel = TRUE AND status_bateria >= 50 AND capacidade_carga >= ? LIMIT 1";
-        try (PreparedStatement stmtDrone = conexao.prepareStatement(sqlDrone)) {
-            stmtDrone.setDouble(1, entrega.getPesoPacote());
-            ResultSet rs = stmtDrone.executeQuery();
+            stmt.setInt(1, entrega.getIdProduto());
+            stmt.setInt(2, entrega.getIdCliente());
+            stmt.setInt(3, entrega.getDrone().getId());
+            stmt.setInt(4, entrega.getPeso());
+            stmt.setString(5, "Pendente");
+            stmt.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now()));
 
-
-            /* TO DO: ao usar o mesmo cliente (mesmo nome e etc) para fazer varios pedidos
-            ao fechar e abrir a interface ele bagunça a ordem de status pendente e finalizado
-            e a quantidade de drones trava gerando essa exceção
-               */
-            if (!rs.next()) {
-                throw new SQLException("Nenhum drone disponível");
-            }
-
-            Drone drone = new Drone(
-                    rs.getInt("status_bateria"),
-                    rs.getDouble("capacidade_carga"),
-                    rs.getBoolean("disponivel")
-            );
-            drone.setId(rs.getInt("id_drone"));
-            entrega.setDrone(drone);
-
-            // atualiza status de disponibilidade de drone para indisponível
-            String sqlAtualizaDrone = "UPDATE Drone SET disponivel = FALSE WHERE id_drone = ?";
-            try (PreparedStatement stmtAtualiza = conexao.prepareStatement(sqlAtualizaDrone)) {
-                stmtAtualiza.setInt(1, drone.getId());
-                stmtAtualiza.executeUpdate();
-            }
-
-            // cadastra a entrega no banco de dados
-            String sqlEntrega = "INSERT INTO Entrega (id_cliente, id_drone, peso_pacote, endereco_destino, status_entrega) VALUES (?, ?, ?, ?, ?)";
-            try (PreparedStatement stmtEntrega = conexao.prepareStatement(sqlEntrega)) {
-                stmtEntrega.setInt(1, entrega.getCliente().getId());
-                stmtEntrega.setInt(2, drone.getId());
-                stmtEntrega.setDouble(3, entrega.getPesoPacote());
-                stmtEntrega.setString(4, entrega.getEnderecoDestino());
-                stmtEntrega.setString(5, "PENDENTE");
-                stmtEntrega.executeUpdate();
-            }
-        }
-    }
-
-    // finaliza todas entregas pendentes e libera os drones
-    public void finalizarEntregasPendentes() throws SQLException {
-        // atualiza status das entregas pendentes para 'FINALIZADA'
-        String sqlAtualizaEntregas = "UPDATE Entrega SET status_entrega = 'FINALIZADA' WHERE status_entrega = 'PENDENTE'";
-        try (PreparedStatement stmt = conexao.prepareStatement(sqlAtualizaEntregas)) {
             stmt.executeUpdate();
-        }
 
-        // atualiza status de disponibilidade para disponível
-        String sqlLiberarDrones = "UPDATE Drone SET disponivel = TRUE";
-        try (PreparedStatement stmt2 = conexao.prepareStatement(sqlLiberarDrones)) {
-            stmt2.executeUpdate();
+            ResultSet rs = stmt.getGeneratedKeys();
+            if (rs.next()) {
+                entrega.setId(rs.getInt(1));
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Erro ao cadastrar entrega: " + e.getMessage());
         }
     }
 
-    // lista entregas com dados completos de cliente e drone
-    public List<Entrega> listarEntregesComClienteEDrone() throws SQLException {
+    // listar todas as entregas
+    public List<Entrega> listarEntregas() {
         List<Entrega> entregas = new ArrayList<>();
-        String sql = "SELECT e.id_entrega, e.peso_pacote, e.endereco_destino, e.status_entrega, " +
-                     "c.id_cliente, c.nome, c.email, c.endereco, c.telefone, " +
-                     "d.id_drone, d.status_bateria, d.capacidade_carga, d.disponivel " +
-                     "FROM Entrega e " +
-                     "JOIN Cliente c ON e.id_cliente = c.id_cliente " +
-                     "JOIN Drone d ON e.id_drone = d.id_drone";
-
-        try (Statement stmt = conexao.createStatement();
+        String sql = "SELECT e.*, d.statusBateria, d.capacidade, d.disponivel FROM Entrega e " +
+                     "JOIN Drone d ON e.idDrone = d.id";
+        try (Connection conn = BancoDeDados.conectar();
+             Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
-                Cliente c = new Cliente(rs.getString("nome"),
-                                        rs.getString("email"),
-                                        rs.getString("endereco"),
-                                        rs.getString("telefone"));
-                c.setId(rs.getInt("id_cliente"));
+                Drone drone = new Drone(
+                        rs.getInt("idDrone"),
+                        rs.getInt("statusBateria"),
+                        rs.getInt("capacidade"),
+                        rs.getBoolean("disponivel")
+                );
 
-                Drone d = new Drone(rs.getInt("status_bateria"),
-                                    rs.getDouble("capacidade_carga"),
-                                    rs.getBoolean("disponivel"));
-                d.setId(rs.getInt("id_drone"));
-
-                Entrega e = new Entrega(c, rs.getDouble("peso_pacote"), rs.getString("endereco_destino"));
-                e.setId(rs.getInt("id_entrega"));
-                e.setDrone(d);
-                e.setStatusEntrega(rs.getString("status_entrega"));
-
-                entregas.add(e);
+                Entrega entrega = new Entrega(
+                        rs.getInt("idProduto"),
+                        rs.getInt("idCliente"),
+                        drone,
+                        rs.getInt("peso")
+                );
+                entrega.setId(rs.getInt("id"));
+                entrega.setStatus(rs.getString("status"));
+                entregas.add(entrega);
             }
-        }
 
+        } catch (SQLException e) {
+            System.out.println("Erro ao listar entregas: " + e.getMessage());
+        }
         return entregas;
+    }
+
+    // listar apenas entregas pendentes
+    public List<Entrega> listarEntregasPendentes() {
+        List<Entrega> entregas = new ArrayList<>();
+        String sql = "SELECT e.*, d.statusBateria, d.capacidade, d.disponivel FROM Entrega e " +
+                     "JOIN Drone d ON e.idDrone = d.id WHERE e.status = 'Pendente'";
+        try (Connection conn = BancoDeDados.conectar();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                Drone drone = new Drone(
+                        rs.getInt("idDrone"),
+                        rs.getInt("statusBateria"),
+                        rs.getInt("capacidade"),
+                        rs.getBoolean("disponivel")
+                );
+
+                Entrega entrega = new Entrega(
+                        rs.getInt("idProduto"),
+                        rs.getInt("idCliente"),
+                        drone,
+                        rs.getInt("peso")
+                );
+                entrega.setId(rs.getInt("id"));
+                entrega.setStatus(rs.getString("status"));
+                entregas.add(entrega);
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Erro ao listar entregas pendentes: " + e.getMessage());
+        }
+        return entregas;
+    }
+
+    // buscar entrega por ID
+    public Entrega buscarEntregaPorId(int id) {
+        String sql = "SELECT e.*, d.statusBateria, d.capacidade, d.disponivel FROM Entrega e " +
+                     "JOIN Drone d ON e.idDrone = d.id WHERE e.id = ?";
+        try (Connection conn = BancoDeDados.conectar();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                Drone drone = new Drone(
+                        rs.getInt("idDrone"),
+                        rs.getInt("statusBateria"),
+                        rs.getInt("capacidade"),
+                        rs.getBoolean("disponivel")
+                );
+
+                Entrega entrega = new Entrega(
+                        rs.getInt("idProduto"),
+                        rs.getInt("idCliente"),
+                        drone,
+                        rs.getInt("peso")
+                );
+                entrega.setId(rs.getInt("id"));
+                entrega.setStatus(rs.getString("status"));
+                return entrega;
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Erro ao buscar entrega: " + e.getMessage());
+        }
+        return null;
+    }
+
+    // atualizar entrega (status)
+    public void atualizarEntrega(Entrega entrega) {
+        String sql = "UPDATE Entrega SET status = ? WHERE id = ?";
+        try (Connection conn = BancoDeDados.conectar();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, entrega.getStatus());
+            stmt.setInt(2, entrega.getId());
+            stmt.executeUpdate();
+
+        } catch (SQLException e) {
+            System.out.println("Erro ao atualizar entrega: " + e.getMessage());
+        }
     }
 }
