@@ -1,4 +1,4 @@
-## Diagrama de classes: [https://drive.google.com/file/d/1N1cs5naotV-E1tr1_bvxOafNCENQxLex/view?usp=sharing](https://drive.google.com/file/d/1N1cs5naotV-E1tr1_bvxOafNCENQxLex/view?usp=sharing)
+## Diagrama de classes: [Drones.drawio.pdf](https://github.com/user-attachments/files/22650845/Drones.drawio.pdf)
 ## Diagrama de sequência: https://drive.google.com/file/d/1i6oVmwnCZChrRgjJcBhaAG81YV4v3oHp/view?usp=sharing
 
 
