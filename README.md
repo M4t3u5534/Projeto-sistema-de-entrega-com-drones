@@ -79,7 +79,7 @@ O sistema inclui validações e tratamentos de erros para aumentar a confiabilid
 
 ## Comunicação com Banco de Dados
 
-O sistema utiliza **MySQL Connector/J** (`mysql-connector-java.jar`) para se conectar ao MySQL. Foi criado um banco de dados local que pode ser alterado apenas pelo administrador. Os comando de criação e omonitoramento foram feitos através do CMD(executado para administrador).
+O sistema utiliza **MySQL Connector/J** (`mysql-connector-java.jar`) para se conectar ao MySQL. Foi criado um banco de dados local que pode ser alterado apenas pelo administrador. Os comandos de criação e monitoramento foram feitos através do CMD(executado para administrador).
 
 ### Funcionamento:
 1. **Arquivo de configuração `config.properties`**:
