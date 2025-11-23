@@ -1,7 +1,3 @@
-## Diagrama de classes: <img width="780" height="798" alt="image" src="https://github.com/user-attachments/assets/b8bd9215-0497-4f31-9bdc-7ed22caf666b" />
-## Diagrama de sequência: https://drive.google.com/file/d/1i6oVmwnCZChrRgjJcBhaAG81YV4v3oHp/view?usp=sharing
-
-
 # Sistema de Entregas com Drones
 
 ## Descrição Geral
